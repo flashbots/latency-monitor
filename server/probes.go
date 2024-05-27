@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -15,6 +16,11 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelapi "go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
+)
+
+var (
+	ErrUnexpectedDstUUIDOnReturn = errors.New("unexpected destination uuid on probe's return")
+	ErrUnexpectedSrcDstUUIDs     = errors.New("source uuid is not us, but non-zero destination uuid")
 )
 
 func (s *Server) sendProbes(ctx context.Context, t *transponder.Transponder) {
@@ -89,7 +95,7 @@ func (s *Server) receiveProbes(ctx context.Context) transponder.Receive {
 		}
 
 		switch {
-		case p.DstUUID == s.uuid && p.DstTimestamp.IsZero(): // reply to the others' probes
+		case p.DstTimestamp.IsZero(): // reply to the others' probes
 			p.DstTimestamp = ts
 			output, err := p.MarshalBinary()
 			if err != nil {

@@ -97,6 +97,13 @@ func (t *Transponder) Run(ctx context.Context) error {
 	}
 }
 
+func (t *Transponder) IsRunning() bool {
+	t.mx.Lock()
+	defer t.mx.Unlock()
+
+	return !t.shuttingDown && t.conn != nil
+}
+
 func (t *Transponder) setupConnection() error {
 	t.mx.Lock()
 	defer t.mx.Unlock()

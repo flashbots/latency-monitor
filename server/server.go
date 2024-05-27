@@ -41,12 +41,7 @@ func New(cfg *config.Config) (*Server, error) {
 	for _, peer := range cfg.Transponder.Peers {
 		peerUUID := srvUUID
 
-		addr, err := peer.UDPAddress()
-		if err != nil {
-			return nil, err
-		}
-
-		if !addr.IP.IsLoopback() {
+		if peer.Name() != "localhost" {
 			peerUUID, err = uuid.NewRandom()
 			if err != nil {
 				return nil, err
@@ -85,7 +80,7 @@ func (s *Server) Run() error {
 
 	ticker := time.NewTicker(s.cfg.Transponder.Interval)
 
-	failure := make(chan error)
+	failure := make(chan error, 1)
 
 	go func() { // run the transponder
 		l.Info("Latency monitor transponder is going up...",
@@ -110,6 +105,10 @@ func (s *Server) Run() error {
 	go func() { // run the ticker
 		for {
 			<-ticker.C
+			if !transponder.IsRunning() {
+				l.Warn("Transponder is not running...")
+				continue
+			}
 			s.sendProbes(ctx, transponder)
 		}
 	}()
@@ -117,14 +116,13 @@ func (s *Server) Run() error {
 	{ // wait until termination or internal failure
 		terminator := make(chan os.Signal, 1)
 		signal.Notify(terminator, os.Interrupt, syscall.SIGTERM)
-		stop := <-terminator
 
 		select {
-		case <-terminator:
+		case stop := <-terminator:
 			l.Info("Stop signal received; shutting down...",
 				zap.String("signal", stop.String()),
 			)
-		case <-failure:
+		case err := <-failure:
 			l.Error("Internal failure; shutting down...",
 				zap.Error(err),
 			)

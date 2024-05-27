@@ -62,7 +62,7 @@ func CommandServe(cfg *config.Config) *cli.Command {
 			Category:    categoryTransponder,
 			Destination: &cfg.Transponder.ListenAddress,
 			EnvVars:     []string{envPrefix + "TRANSPONDER_LISTEN_ADDRESS"},
-			Name:        "transponder-listen-port",
+			Name:        "transponder-listen-address",
 			Usage:       "`host:port` for the transponder to listen on",
 			Value:       "0.0.0.0:32123",
 		},
@@ -73,7 +73,6 @@ func CommandServe(cfg *config.Config) *cli.Command {
 			EnvVars:     []string{envPrefix + "TRANSPONDER_PEER"},
 			Name:        "transponder-peer",
 			Usage:       "`name=host:port` of the transponder peer to measure the latency against",
-			Value:       cli.NewStringSlice("localhost=127.0.0.1:32123"),
 		},
 	}
 

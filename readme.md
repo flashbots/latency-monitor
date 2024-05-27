@@ -7,8 +7,7 @@ report the statistics as prometheus metrics.
 
 ```shell
 latency-monitor serve \
-  --transponder-listen-port 127.0.0.1:32123 \
-  --transponder-peer localhost=127.0.0.1:32123
+  --transponder-listen-address 127.0.0.1:32123
 ```
 
 ```shell
@@ -93,7 +92,8 @@ latency_monitor_return_trip_latency_microseconds_sum{peer="localhost"} 84
 ```
 
 >
-> Note: In real situation it still makes sense to keep localhost among the peers
->       to adjust the remote peers for locally incurred implicit latency (that
->       is, by subtracting local average latency from all remote ones).
+> Note: There is a specially-treated peer name `localhost` that can be used to
+>       send probes to self.  This can be used to adjust the remote peers's
+>       latencies for locally incurred implicit ones (that is, by subtracting
+>       local average latency from all remote ones).
 >
