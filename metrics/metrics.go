@@ -82,7 +82,7 @@ func setupLatencyBoundariesUs(ctx context.Context, cfg *config.Metrics) error {
 	latencyBoundariesUs = otelapi.WithExplicitBucketBoundaries(func() []float64 {
 		base := math.Exp(math.Log(float64(cfg.MaxLatencyUs)) / (float64(cfg.LatencyBucketsCount - 1)))
 		res := make([]float64, 0, cfg.LatencyBucketsCount)
-		for i := 0; i < 33; i++ {
+		for i := 0; i < cfg.LatencyBucketsCount; i++ {
 			res = append(res,
 				math.Round(2*math.Pow(base, float64(i)))/2,
 			)
