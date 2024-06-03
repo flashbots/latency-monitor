@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/flashbots/latency-monitor/config"
@@ -17,9 +19,18 @@ const (
 )
 
 func CommandServe(cfg *config.Config) *cli.Command {
+	metricsLabels := &cli.StringSlice{}
 	transponderPeers := &cli.StringSlice{}
 
 	metricsFlags := []cli.Flag{
+		&cli.StringSliceFlag{
+			Category:    categoryMetrics,
+			Destination: metricsLabels,
+			EnvVars:     []string{envPrefix + "METRICS_LABELS"},
+			Name:        "metrics-label",
+			Usage:       "extra metrics labels in the format `label=value`",
+		},
+
 		&cli.StringFlag{
 			Category:    categoryMetrics,
 			Destination: &cfg.Metrics.ListenAddress,
@@ -70,7 +81,7 @@ func CommandServe(cfg *config.Config) *cli.Command {
 		&cli.StringSliceFlag{
 			Category:    categoryTransponder,
 			Destination: transponderPeers,
-			EnvVars:     []string{envPrefix + "TRANSPONDER_PEER"},
+			EnvVars:     []string{envPrefix + "TRANSPONDER_PEERS"},
 			Name:        "transponder-peer",
 			Usage:       "`name=host:port` of the transponder peer to measure the latency against",
 		},
@@ -99,16 +110,30 @@ func CommandServe(cfg *config.Config) *cli.Command {
 		Flags: flags,
 
 		Before: func(ctx *cli.Context) error {
+			// metrics labels
+			l := metricsLabels.Value()
+			labels := make(map[string]string, len(l))
+			for _, strLabel := range l {
+				parts := strings.Split(strLabel, "=")
+				if len(parts) != 2 {
+					return fmt.Errorf("invalid label format: %s", strLabel)
+				}
+				labels[parts[0]] = parts[1]
+			}
+			cfg.Metrics.Labels = labels
+
+			// transponder peers
 			p := transponderPeers.Value()
 			peers := make([]types.Peer, 0, len(p))
-			for _, s := range p {
-				peer, err := types.NewPeer(s)
+			for _, strPeer := range p {
+				peer, err := types.NewPeer(strPeer)
 				if err != nil {
 					return err
 				}
 				peers = append(peers, peer)
 			}
 			cfg.Transponder.Peers = peers
+
 			return nil
 		},
 

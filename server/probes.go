@@ -13,7 +13,7 @@ import (
 	"github.com/flashbots/latency-monitor/metrics"
 	"github.com/flashbots/latency-monitor/transponder"
 	"github.com/flashbots/latency-monitor/types"
-	"go.opentelemetry.io/otel/attribute"
+	otelattr "go.opentelemetry.io/otel/attribute"
 	otelapi "go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 )
@@ -29,8 +29,8 @@ func (s *Server) sendProbes(ctx context.Context, t *transponder.Transponder) {
 	for peerUUID, peer := range s.peers {
 		addr, err := peer.UDPAddress()
 		if err != nil {
-			metrics.CounterFailedProbeSend.Add(ctx, 1, otelapi.WithAttributes(
-				attribute.String("error_type", reflect.TypeOf(err).String()),
+			metrics.CounterFailedProbeSend.Add(ctx, 1, s.labels, otelapi.WithAttributes(
+				otelattr.String("error_type", reflect.TypeOf(err).String()),
 			))
 			l.Error("Failed to send a probe",
 				zap.Error(err),
@@ -48,8 +48,8 @@ func (s *Server) sendProbes(ctx context.Context, t *transponder.Transponder) {
 
 		b, err := p.MarshalBinary()
 		if err != nil {
-			metrics.CounterFailedProbeSend.Add(ctx, 1, otelapi.WithAttributes(
-				attribute.String("error_type", reflect.TypeOf(err).String()),
+			metrics.CounterFailedProbeSend.Add(ctx, 1, s.labels, otelapi.WithAttributes(
+				otelattr.String("error_type", reflect.TypeOf(err).String()),
 			))
 			l.Error("Failed to prepare a probe",
 				zap.Error(err),
@@ -58,16 +58,16 @@ func (s *Server) sendProbes(ctx context.Context, t *transponder.Transponder) {
 		}
 
 		t.Send(b, addr, func(err error) {
-			metrics.CounterFailedProbeSend.Add(ctx, 1, otelapi.WithAttributes(
-				attribute.String("error_type", reflect.TypeOf(err).String()),
+			metrics.CounterFailedProbeSend.Add(ctx, 1, s.labels, otelapi.WithAttributes(
+				otelattr.String("error_type", reflect.TypeOf(err).String()),
 			))
 			l.Error("Failed to send a probe",
 				zap.Error(err),
 			)
 		})
 
-		metrics.CountProbeSent.Add(ctx, 1, otelapi.WithAttributes(
-			attribute.String("peer", peer.Name()),
+		metrics.CountProbeSent.Add(ctx, 1, s.labels, otelapi.WithAttributes(
+			otelattr.String("peer", peer.Name()),
 		))
 		l.Debug("Sent a probe",
 			zap.String("name", peer.Name()),
@@ -83,8 +83,8 @@ func (s *Server) receiveProbes(ctx context.Context) transponder.Receive {
 
 		p := types.Probe{}
 		if err := p.UnmarshalBinary(input); err != nil {
-			metrics.CounterInvalidProbeReceived.Add(ctx, 1, otelapi.WithAttributes(
-				attribute.String("error_type", reflect.TypeOf(err).String()),
+			metrics.CounterInvalidProbeReceived.Add(ctx, 1, s.labels, otelapi.WithAttributes(
+				otelattr.String("error_type", reflect.TypeOf(err).String()),
 			))
 			l.Error("Invalid probe",
 				zap.Error(err),
@@ -99,8 +99,8 @@ func (s *Server) receiveProbes(ctx context.Context) transponder.Receive {
 			p.DstTimestamp = ts
 			output, err := p.MarshalBinary()
 			if err != nil {
-				metrics.CounterFailedProbeRespond.Add(ctx, 1, otelapi.WithAttributes(
-					attribute.String("error_type", reflect.TypeOf(err).String()),
+				metrics.CounterFailedProbeRespond.Add(ctx, 1, s.labels, otelapi.WithAttributes(
+					otelattr.String("error_type", reflect.TypeOf(err).String()),
 				))
 				l.Error("Failed to prepare response to a probe",
 					zap.Error(err),
@@ -110,8 +110,8 @@ func (s *Server) receiveProbes(ctx context.Context) transponder.Receive {
 
 			go func() {
 				t.Send(output, source, func(err error) {
-					metrics.CounterFailedProbeRespond.Add(ctx, 1, otelapi.WithAttributes(
-						attribute.String("error_type", reflect.TypeOf(err).String()),
+					metrics.CounterFailedProbeRespond.Add(ctx, 1, s.labels, otelapi.WithAttributes(
+						otelattr.String("error_type", reflect.TypeOf(err).String()),
 					))
 					l.Error("Failed to respond to a probe",
 						zap.Error(err),
@@ -125,8 +125,8 @@ func (s *Server) receiveProbes(ctx context.Context) transponder.Receive {
 				err := fmt.Errorf("%w: %s",
 					ErrUnexpectedDstUUIDOnReturn, p.DstUUID.String(),
 				)
-				metrics.CounterInvalidProbeReceived.Add(ctx, 1, otelapi.WithAttributes(
-					attribute.String("error_type", reflect.TypeOf(err).String()),
+				metrics.CounterInvalidProbeReceived.Add(ctx, 1, s.labels, otelapi.WithAttributes(
+					otelattr.String("error_type", reflect.TypeOf(err).String()),
 				))
 				l.Error("Invalid return probe",
 					zap.Error(err),
@@ -136,17 +136,17 @@ func (s *Server) receiveProbes(ctx context.Context) transponder.Receive {
 			}
 
 			forwardLatency := float64(p.DstTimestamp.Sub(p.SrcTimestamp).Microseconds())
-			metrics.HistogramLatencyForwardTrip.Record(ctx, forwardLatency, otelapi.WithAttributes(
-				attribute.String("peer", peer.Name()),
+			metrics.HistogramLatencyForwardTrip.Record(ctx, forwardLatency, s.labels, otelapi.WithAttributes(
+				otelattr.String("peer", peer.Name()),
 			))
 
 			returnLatency := float64(ts.Sub(p.DstTimestamp).Microseconds())
-			metrics.HistogramLatencyReturnTrip.Record(ctx, returnLatency, otelapi.WithAttributes(
-				attribute.String("peer", peer.Name()),
+			metrics.HistogramLatencyReturnTrip.Record(ctx, returnLatency, s.labels, otelapi.WithAttributes(
+				otelattr.String("peer", peer.Name()),
 			))
 
-			metrics.CountProbeReturned.Add(ctx, 1, otelapi.WithAttributes(
-				attribute.String("peer", peer.Name()),
+			metrics.CountProbeReturned.Add(ctx, 1, s.labels, otelapi.WithAttributes(
+				otelattr.String("peer", peer.Name()),
 			))
 			l.Debug("Received a return probe",
 				zap.Float64("forward_latency_ms", forwardLatency),
@@ -160,8 +160,8 @@ func (s *Server) receiveProbes(ctx context.Context) transponder.Receive {
 			err := fmt.Errorf("%w: source %s, destination %s",
 				ErrUnexpectedSrcDstUUIDs, p.SrcUUID.String(), p.DstUUID.String(),
 			)
-			metrics.CounterInvalidProbeReceived.Add(ctx, 1, otelapi.WithAttributes(
-				attribute.String("error_type", reflect.TypeOf(err).String()),
+			metrics.CounterInvalidProbeReceived.Add(ctx, 1, s.labels, otelapi.WithAttributes(
+				otelattr.String("error_type", reflect.TypeOf(err).String()),
 			))
 			l.Error("Invalid probe",
 				zap.Error(err),

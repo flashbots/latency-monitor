@@ -61,7 +61,7 @@ func main() {
 			zap.ReplaceGlobals(l)
 
 			// inject version
-			cfg.Metrics.MetricsVersion = version
+			cfg.Metrics.Version = version
 
 			return nil
 		},

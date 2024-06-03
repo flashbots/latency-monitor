@@ -17,6 +17,8 @@ import (
 	"github.com/flashbots/latency-monitor/types"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	otelattr "go.opentelemetry.io/otel/attribute"
+	otelapi "go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 )
 
@@ -24,9 +26,10 @@ type Server struct {
 	cfg *config.Config
 	log *zap.Logger
 
-	uuid uuid.UUID
-
+	uuid  uuid.UUID
 	peers map[uuid.UUID]*types.Peer
+
+	labels otelapi.MeasurementOption
 }
 
 func New(cfg *config.Config) (*Server, error) {
@@ -35,6 +38,11 @@ func New(cfg *config.Config) (*Server, error) {
 	srvUUID, err := uuid.NewRandom()
 	if err != nil {
 		return nil, err
+	}
+
+	labels := make([]otelattr.KeyValue, 0, len(cfg.Metrics.Labels))
+	for k, v := range cfg.Metrics.Labels {
+		labels = append(labels, otelattr.String(k, v))
 	}
 
 	peers := make(map[uuid.UUID]*types.Peer, len(cfg.Transponder.Peers))
@@ -55,7 +63,8 @@ func New(cfg *config.Config) (*Server, error) {
 		log:  l,
 		uuid: srvUUID,
 
-		peers: peers,
+		labels: otelapi.WithAttributeSet(otelattr.NewSet(labels...)),
+		peers:  peers,
 	}, nil
 }
 
