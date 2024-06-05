@@ -13,18 +13,20 @@ type Probe struct {
 	Sequence     uint64
 	SrcUUID      uuid.UUID
 	SrcTimestamp time.Time
+	SrcLocation  Location
 	DstUUID      uuid.UUID
 	DstTimestamp time.Time
+	DstLocation  Location
+}
+
+func ProbeSize() int {
+	return 142
 }
 
 var (
 	ErrProbeFailedToEncodeBinaryRepresentation = errors.New("failed to encode probe into its binary representation")
 	ErrProbeFailedToDecodeBinaryRepresentation = errors.New("failed to decode probe from its binary representation")
 )
-
-func ProbeSize() int {
-	return 72
-}
 
 func (p Probe) MarshalBinary() ([]byte, error) {
 	rawSrcTimestamp, err := p.SrcTimestamp.MarshalBinary()
@@ -40,13 +42,15 @@ func (p Probe) MarshalBinary() ([]byte, error) {
 		)
 	}
 
-	data := make([]byte, 72)
+	data := make([]byte, ProbeSize())
 
-	binary.LittleEndian.PutUint64(data[0:8], p.Sequence) // 00..07 : 8 bytes
-	copy(data[8:24], p.SrcUUID[:])                       // 08..23 : 16 bytes
-	copy(data[24:39], rawSrcTimestamp)                   // 24..38 : 15 bytes
-	copy(data[39:55], p.DstUUID[:])                      // 39..54 : 16 bytes
-	copy(data[55:70], rawDstTimestamp)                   // 55..71 : 15 bytes
+	binary.LittleEndian.PutUint64(data[0:8], p.Sequence) // 000..007  : 8 bytes
+	copy(data[8:24], p.SrcUUID[:])                       // 008..023  : 16 bytes
+	copy(data[24:39], rawSrcTimestamp)                   // 024..038  : 15 bytes
+	copy(data[39:75], p.SrcLocation[:])                  // 039..074  : 36 bytes
+	copy(data[75:91], p.DstUUID[:])                      // 075..090  : 16 bytes
+	copy(data[91:106], rawDstTimestamp)                  // 091..105  : 15 bytes
+	copy(data[106:142], p.DstLocation[:])                // 106..142  : 36 bytes
 
 	return data, nil
 }
@@ -72,7 +76,10 @@ func (p *Probe) UnmarshalBinary(data []byte) error {
 		)
 	}
 
-	dstUUID, err := uuid.FromBytes(data[39:55])
+	srcLocation := Location{}
+	copy(srcLocation[:], data[39:75])
+
+	dstUUID, err := uuid.FromBytes(data[75:91])
 	if err != nil {
 		return fmt.Errorf("%w: DstUUID: %w",
 			ErrProbeFailedToDecodeBinaryRepresentation, err,
@@ -80,18 +87,23 @@ func (p *Probe) UnmarshalBinary(data []byte) error {
 	}
 
 	dstTimestamp := &time.Time{}
-	if err := dstTimestamp.UnmarshalBinary(data[55:70]); err != nil {
+	if err := dstTimestamp.UnmarshalBinary(data[91:106]); err != nil {
 		return fmt.Errorf("%w: DstTimestamp: %w",
 			ErrProbeFailedToDecodeBinaryRepresentation, err,
 		)
 	}
 
+	dstLocation := Location{}
+	copy(dstLocation[:], data[106:142])
+
 	*p = Probe{
 		Sequence:     binary.LittleEndian.Uint64(data[:8]),
 		SrcUUID:      srcUUID,
 		SrcTimestamp: *srcTimestamp,
+		SrcLocation:  srcLocation,
 		DstUUID:      dstUUID,
 		DstTimestamp: *dstTimestamp,
+		DstLocation:  dstLocation,
 	}
 
 	return nil

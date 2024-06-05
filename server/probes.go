@@ -40,9 +40,10 @@ func (s *Server) sendProbes(ctx context.Context, t *transponder.Transponder) {
 		}
 
 		p := types.Probe{
-			Sequence: peer.Sequence(),
-			SrcUUID:  s.uuid,
-			DstUUID:  peerUUID,
+			Sequence:    peer.Sequence(),
+			SrcUUID:     s.uuid,
+			SrcLocation: s.location,
+			DstUUID:     peerUUID,
 		}
 		p.SrcTimestamp = time.Now()
 
@@ -97,6 +98,7 @@ func (s *Server) receiveProbes(ctx context.Context) transponder.Receive {
 		switch {
 		case p.DstTimestamp.IsZero(): // reply to the others' probes
 			p.DstTimestamp = ts
+			p.DstLocation = s.location
 			output, err := p.MarshalBinary()
 			if err != nil {
 				metrics.CounterFailedProbeRespond.Add(ctx, 1, s.labels, otelapi.WithAttributes(
@@ -138,11 +140,15 @@ func (s *Server) receiveProbes(ctx context.Context) transponder.Receive {
 			forwardLatency := float64(p.DstTimestamp.Sub(p.SrcTimestamp).Microseconds())
 			metrics.HistogramLatencyForwardTrip.Record(ctx, forwardLatency, s.labels, otelapi.WithAttributes(
 				otelattr.String("peer", peer.Name()),
+				otelattr.String("from", p.SrcLocation.String()),
+				otelattr.String("to", p.DstLocation.String()),
 			))
 
 			returnLatency := float64(ts.Sub(p.DstTimestamp).Microseconds())
 			metrics.HistogramLatencyReturnTrip.Record(ctx, returnLatency, s.labels, otelapi.WithAttributes(
 				otelattr.String("peer", peer.Name()),
+				otelattr.String("to", p.SrcLocation.String()),
+				otelattr.String("from", p.DstLocation.String()),
 			))
 
 			metrics.CountProbeReturned.Add(ctx, 1, s.labels, otelapi.WithAttributes(

@@ -9,6 +9,7 @@ import (
 	"github.com/flashbots/latency-monitor/config"
 	"github.com/flashbots/latency-monitor/server"
 	"github.com/flashbots/latency-monitor/types"
+	"github.com/google/uuid"
 	"github.com/urfave/cli/v2"
 )
 
@@ -31,6 +32,15 @@ func CommandServe(cfg *config.Config) *cli.Command {
 			Usage:       "extra metrics labels in the format `label=value`",
 		},
 
+		&cli.IntFlag{
+			Category:    categoryMetrics,
+			Destination: &cfg.Metrics.LatencyBucketsCount,
+			EnvVars:     []string{envPrefix + "METRICS_LATENCY_BUCKETS_COUNT"},
+			Name:        "metrics-latency-buckets-count",
+			Usage:       "`count` of latency histogram buckets",
+			Value:       33,
+		},
+
 		&cli.StringFlag{
 			Category:    categoryMetrics,
 			Destination: &cfg.Metrics.ListenAddress,
@@ -40,13 +50,13 @@ func CommandServe(cfg *config.Config) *cli.Command {
 			Value:       "0.0.0.0:8080",
 		},
 
-		&cli.IntFlag{
+		&cli.StringFlag{
 			Category:    categoryMetrics,
-			Destination: &cfg.Metrics.LatencyBucketsCount,
-			EnvVars:     []string{envPrefix + "METRICS_LATENCY_BUCKETS_COUNT"},
-			Name:        "metrics-latency-buckets-count",
-			Usage:       "`count` of latency histogram buckets",
-			Value:       33,
+			Destination: &cfg.Metrics.Location,
+			EnvVars:     []string{envPrefix + "METRICS_LOCATION"},
+			Name:        "metrics-location",
+			Usage:       fmt.Sprintf("`location` to be reported as 'from' and 'to' labels (max %d bytes)", types.LocationSize()),
+			Value:       uuid.Must(uuid.NewRandom()).String(),
 		},
 
 		&cli.IntFlag{
@@ -110,6 +120,14 @@ func CommandServe(cfg *config.Config) *cli.Command {
 		Flags: flags,
 
 		Before: func(ctx *cli.Context) error {
+			// location
+			loc := []byte(cfg.Metrics.Location)
+			if len(loc) > types.LocationSize() {
+				return fmt.Errorf("byte representation of location must not exceed %d bytes: %s",
+					len(loc), cfg.Metrics.Location,
+				)
+			}
+
 			// metrics labels
 			l := metricsLabels.Value()
 			labels := make(map[string]string, len(l))

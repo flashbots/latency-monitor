@@ -29,7 +29,8 @@ type Server struct {
 	uuid  uuid.UUID
 	peers map[uuid.UUID]*types.Peer
 
-	labels otelapi.MeasurementOption
+	labels   otelapi.MeasurementOption
+	location types.Location
 }
 
 func New(cfg *config.Config) (*Server, error) {
@@ -45,6 +46,9 @@ func New(cfg *config.Config) (*Server, error) {
 		labels = append(labels, otelattr.String(k, v))
 	}
 
+	location := types.Location{}
+	copy(location[:], []byte(cfg.Metrics.Location))
+
 	peers := make(map[uuid.UUID]*types.Peer, len(cfg.Transponder.Peers))
 	for _, peer := range cfg.Transponder.Peers {
 		peerUUID := srvUUID
@@ -59,12 +63,14 @@ func New(cfg *config.Config) (*Server, error) {
 	}
 
 	return &Server{
-		cfg:  cfg,
-		log:  l,
-		uuid: srvUUID,
+		cfg: cfg,
+		log: l,
 
-		labels: otelapi.WithAttributeSet(otelattr.NewSet(labels...)),
-		peers:  peers,
+		uuid:  srvUUID,
+		peers: peers,
+
+		labels:   otelapi.WithAttributeSet(otelattr.NewSet(labels...)),
+		location: location,
 	}, nil
 }
 
